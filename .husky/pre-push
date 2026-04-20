@@ -1,0 +1,3 @@
+# Phase 17 BUILD-03: CI gate — блокирует push если pnpm typecheck fails.
+# Предотвращает регрессии BUILD-01 (zero typecheck errors).
+pnpm typecheck
