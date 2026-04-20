@@ -1,0 +1,2 @@
+# Planning docs contain __tests__ paths that prettier corrupts to **tests**
+.planning/
