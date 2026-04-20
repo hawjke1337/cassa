@@ -1,0 +1,1347 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(100)
+  address   String   @db.VarChar(500)
+  phone     String?  @db.VarChar(20)
+  isActive  Boolean  @default(true)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            UserStore[]
+  roles            UserRole[]
+  products         StoreProduct[]
+  sales            Sale[]
+  customOrders     CustomOrder[]
+  stockReceives    StockReceive[]
+  transfersFrom    StockTransfer[]    @relation("TransferFrom")
+  transfersTo      StockTransfer[]    @relation("TransferTo")
+  inventoryAudits  InventoryAudit[]
+  stockWriteOffs   StockWriteOff[]
+  repairs          Repair[]
+  priceLabelTemplates PriceLabelTemplate[]
+  documentTemplates   DocumentTemplate[]
+  motivationSchemes   MotivationScheme[]
+  motivationAssignments MotivationAssignment[]
+  payrolls            Payroll[]
+  tradeIns         TradeIn[]
+  expensePayments  Payment[]    @relation("PaymentStore")
+  paymentFeeConfigs PaymentFeeConfig[]
+  shifts           Shift[]
+  funds            Fund[]
+  serialUnits      SerialUnit[]
+  serialUnitHistory SerialUnitHistory[]
+  warrantyClaims   WarrantyClaim[]
+  priceHistory     PriceHistory[]
+  repairParts      RepairPart[]
+  auditLogs        AuditLog[]
+
+  @@index([deletedAt])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  login     String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255)
+  firstName String   @db.VarChar(100)
+  lastName  String   @db.VarChar(100)
+  phone     String?  @db.VarChar(20)
+  isActive  Boolean  @default(true)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  permissionsVersion Int @default(1)
+  mustChangePassword Boolean @default(false)
+
+  stores           UserStore[]
+  roles            UserRole[]
+  sales            Sale[]   @relation("SellerSales")
+  processedReturns Return[] @relation("ProcessedReturns")
+  customOrders     CustomOrder[]      @relation("OrderSeller")
+  statusChanges    OrderStatusHistory[] @relation("StatusChangedBy")
+  stockReceives    StockReceive[]     @relation("ReceivedBy")
+  transfersCreated StockTransfer[]    @relation("TransferCreatedBy")
+  auditsCreated    InventoryAudit[]   @relation("AuditCreatedBy")
+  writeOffsCreated StockWriteOff[]    @relation("WriteOffCreatedBy")
+  repairsMastered     Repair[]               @relation("RepairMaster")
+  repairsCreated      Repair[]               @relation("RepairCreatedBy")
+  repairStatusChanges RepairStatusHistory[]   @relation("RepairStatusChangedBy")
+  priceLabelTemplates PriceLabelTemplate[]   @relation("PriceLabelCreatedBy")
+  documentTemplates   DocumentTemplate[]     @relation("DocumentTemplateCreatedBy")
+  createdSchemes      MotivationScheme[]     @relation("SchemeCreator")
+  approvedSchemes     MotivationScheme[]     @relation("SchemeApprover")
+  motivationAssignments MotivationAssignment[]
+  payrolls            Payroll[]
+  tradeInsAccepted TradeIn[]    @relation("TradeInAcceptedBy")
+  shiftsOpened     Shift[]          @relation("ShiftOpenedBy")
+  shiftsClosed     Shift[]          @relation("ShiftClosedBy")
+  cashOperations   CashOperation[]  @relation("CashOpPerformedBy")
+  serialUnitHistory SerialUnitHistory[] @relation("SerialUnitHistoryPerformer")
+  warrantyClaims    WarrantyClaim[]     @relation("WarrantyClaimCreatedBy")
+  priceHistoryChanges PriceHistory[] @relation("PriceHistoryChangedBy")
+  repairCostChanges   RepairCostHistory[] @relation("RepairCostChangedBy")
+  supplierPayments    SupplierPayment[] @relation("SupplierPaymentUser")
+
+  auditLogs        AuditLog[]
+  quantityChangeLogs StoreProductHistory[]
+
+  @@index([deletedAt])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(1000)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(100)
+  module      String   @db.VarChar(100)
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(1000)
+  updatedAt   DateTime @updatedAt
+
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id      String  @id @default(cuid())
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId  String
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  storeId String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, roleId, storeId])
+}
+
+model UserStore {
+  id      String @id @default(cuid())
+  user    User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, storeId])
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String     @db.VarChar(100)
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+  isSerialized    Boolean         @default(false)
+  identifierType  IdentifierType?
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, parentId])
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  name     String    @unique @db.VarChar(100)
+  products Product[]
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(255)
+  sku         String   @unique @db.VarChar(100)
+  barcode     String?  @unique @db.VarChar(100)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId  String
+  brand       Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brandId     String?
+  description String?  @db.VarChar(2000)
+  unit        String   @default("шт") @db.VarChar(20)
+  isActive    Boolean  @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  storeProducts      StoreProduct[]
+  priceHistory       PriceHistory[]
+  saleItems          SaleItem[]
+  customOrderItems   CustomOrderItem[]
+  stockReceiveItems  StockReceiveItem[]
+  stockTransferItems StockTransferItem[]
+  inventoryAuditItems InventoryAuditItem[]
+  stockWriteOffItems StockWriteOffItem[]
+  motivationGroup    MotivationGroupProduct?
+  tradeIn     TradeIn?
+  serialUnits SerialUnit[]
+  repairParts RepairPart[]
+
+  @@index([deletedAt])
+}
+
+model StoreProduct {
+  id         String  @id @default(cuid())
+  store      Store   @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId    String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId  String
+  quantity         Int     @default(0)
+  reservedQuantity Int     @default(0)
+  minQty           Int     @default(0)
+  sellPrice  Decimal @db.Decimal(12, 2)
+  costPrice  Decimal @db.Decimal(12, 2)
+  deletedAt  DateTime?
+  updatedAt  DateTime @updatedAt
+
+  quantityHistory StoreProductHistory[]
+
+  @@unique([storeId, productId])
+  @@index([deletedAt])
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId   String
+  field     String   @db.VarChar(50)
+  oldPrice  Decimal  @db.Decimal(12, 2)
+  newPrice  Decimal  @db.Decimal(12, 2)
+  changedByUser User @relation("PriceHistoryChangedBy", fields: [changedBy], references: [id], onDelete: Restrict)
+  changedBy String
+  changedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([storeId])
+}
+
+// ---- POS / Sales ----
+
+model Counter {
+  id      String @id
+  current Int    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Sale {
+  id             String      @id @default(cuid())
+  number         String      @unique @db.VarChar(50)
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId        String
+  seller         User        @relation("SellerSales", fields: [sellerId], references: [id], onDelete: Restrict)
+  sellerId       String
+  type           SaleType    @default(RETAIL)
+  status         SaleStatus  @default(COMPLETED)
+  totalAmount    Decimal     @db.Decimal(12, 2)
+  discountAmount Decimal     @default(0) @db.Decimal(12, 2)
+  finalAmount    Decimal     @db.Decimal(12, 2)
+  cashReceived   Decimal?    @db.Decimal(12, 2)
+  changeAmount   Decimal?    @db.Decimal(12, 2)
+  comment        String?     @db.VarChar(1000)
+  shift          Shift?      @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId        String?
+  idempotencyKey String?     @unique @db.VarChar(36)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items       SaleItem[]
+  payments    Payment[]
+  returns     Return[]
+  customOrder CustomOrder?
+  tradeIns    TradeIn[]
+  repair      Repair?
+
+  @@index([shiftId])
+  @@index([storeId, createdAt])
+  @@index([sellerId])
+}
+
+enum SaleType {
+  RETAIL
+  WHOLESALE
+  REPAIR
+}
+
+enum SaleStatus {
+  COMPLETED
+  RETURNED
+  PARTIALLY_RETURNED
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId    String
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId String?
+  name      String   @default("") @db.VarChar(255)
+  quantity  Int
+  price     Decimal  @db.Decimal(12, 2)
+  costPrice Decimal  @db.Decimal(12, 2)
+  discount  Decimal  @default(0) @db.Decimal(12, 2)
+  total     Decimal  @db.Decimal(12, 2)
+
+  serialUnit    SerialUnit?  @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  serialUnitId  String?      @unique
+  returnItems ReturnItem[]
+  updatedAt   DateTime @updatedAt
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  sale      Sale?         @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleId    String?
+  order     CustomOrder?  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId   String?
+  repair    Repair?       @relation(fields: [repairId], references: [id], onDelete: Restrict)
+  repairId  String?
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(12, 2)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tradeIn   TradeIn?
+  isExpense Boolean       @default(false)
+  feeAmount Decimal?      @db.Decimal(12, 2)
+  storeId   String?
+  store     Store?        @relation("PaymentStore", fields: [storeId], references: [id], onDelete: SetNull)
+  // FIN-11: shiftId теперь NOT NULL — каждый Payment обязан быть привязан к смене
+  shift     Shift         @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId   String
+
+  @@index([shiftId])
+  @@index([saleId])
+  @@index([method])
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  SBP
+  TRANSFER
+  CREDIT
+}
+
+model PaymentFeeConfig {
+  id        String        @id @default(cuid())
+  store     Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  method    PaymentMethod
+  feeRate   Decimal       @db.Decimal(5, 4)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([storeId, method])
+}
+
+model Return {
+  id          String   @id @default(cuid())
+  number      String   @unique @db.VarChar(50)
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleId      String
+  reason      String   @db.VarChar(1000)
+  amount      Decimal  @db.Decimal(12, 2)
+  processedBy  User           @relation("ProcessedReturns", fields: [userId], references: [id], onDelete: Restrict)
+  userId       String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  // FIN-09: refundMethod теперь NOT NULL — метод возврата обязателен при создании Return
+  refundMethod PaymentMethod
+  shift        Shift?         @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId      String?
+
+  items ReturnItem[]
+
+  @@index([shiftId])
+  @@index([saleId])
+}
+
+model ReturnItem {
+  id         String   @id @default(cuid())
+  return_    Return   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  returnId   String
+  saleItem   SaleItem @relation(fields: [saleItemId], references: [id])
+  saleItemId String
+  quantity   Int
+  updatedAt  DateTime @updatedAt
+
+  @@index([returnId])
+  @@index([saleItemId])
+}
+
+// ---- Suppliers ----
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(100)
+  contactName String?  @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  email       String?  @db.VarChar(255)
+  website     String?  @db.VarChar(500)
+  city        String?  @db.VarChar(100)
+  address     String?  @db.VarChar(500)
+  inn         String?  @unique @db.VarChar(12)
+  comment     String?  @db.VarChar(1000)
+  isActive    Boolean  @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stockReceives  StockReceive[]
+  customOrders   CustomOrder[]
+  debts          SupplierDebt[]
+  cashOperations CashOperation[]
+
+  @@index([deletedAt])
+}
+
+// ---- Inventory ----
+
+// Приход товара
+model StockReceive {
+  id          String         @id @default(cuid())
+  number      String         @unique @db.VarChar(50)
+  store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId     String
+  supplier    Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierId  String?
+  status      DocumentStatus @default(DRAFT)
+  totalAmount Decimal        @db.Decimal(12, 2)
+  comment     String?        @db.VarChar(1000)
+  receivedBy  User           @relation("ReceivedBy", fields: [userId], references: [id], onDelete: Restrict)
+  userId      String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  confirmedAt DateTime?
+  items       StockReceiveItem[]
+
+  @@index([storeId, createdAt])
+  @@index([supplierId])
+}
+
+model StockReceiveItem {
+  id        String       @id @default(cuid())
+  receive   StockReceive @relation(fields: [receiveId], references: [id], onDelete: Cascade)
+  receiveId String
+  product   Product      @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  costPrice Decimal      @db.Decimal(12, 2)
+  updatedAt DateTime     @updatedAt
+  serialUnits SerialUnit[]
+}
+
+// Перемещение между магазинами
+model StockTransfer {
+  id          String         @id @default(cuid())
+  number      String         @unique @db.VarChar(50)
+  fromStore   Store          @relation("TransferFrom", fields: [fromStoreId], references: [id], onDelete: Restrict)
+  fromStoreId String
+  toStore     Store          @relation("TransferTo", fields: [toStoreId], references: [id], onDelete: Restrict)
+  toStoreId   String
+  status      TransferStatus @default(PENDING)
+  createdBy   User           @relation("TransferCreatedBy", fields: [userId], references: [id], onDelete: Restrict)
+  userId      String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  confirmedAt DateTime?
+  items       StockTransferItem[]
+
+  @@index([fromStoreId])
+  @@index([toStoreId])
+}
+
+model StockTransferItem {
+  id         String        @id @default(cuid())
+  transfer   StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  transferId String
+  product    Product       @relation(fields: [productId], references: [id])
+  productId  String
+  quantity   Int
+  updatedAt  DateTime      @updatedAt
+  serialUnits StockTransferItemSerial[]
+}
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+// Инвентаризация
+model InventoryAudit {
+  id        String         @id @default(cuid())
+  number    String         @unique @db.VarChar(50)
+  store     Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId   String
+  status    DocumentStatus @default(DRAFT)
+  createdBy User           @relation("AuditCreatedBy", fields: [userId], references: [id], onDelete: Restrict)
+  userId    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  closedAt  DateTime?
+  items     InventoryAuditItem[]
+  auditSerials InventoryAuditSerial[]
+
+  @@index([storeId])
+}
+
+model InventoryAuditItem {
+  id          String         @id @default(cuid())
+  audit       InventoryAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId     String
+  product     Product        @relation(fields: [productId], references: [id])
+  productId   String
+  expectedQty Int
+  actualQty   Int?
+  difference  Int?
+  updatedAt   DateTime       @updatedAt
+  auditSerials InventoryAuditSerial[]
+}
+
+// Списание
+model StockWriteOff {
+  id        String            @id @default(cuid())
+  number    String            @unique @db.VarChar(50)
+  store     Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId   String
+  reason    String            @db.VarChar(1000)
+  createdBy User              @relation("WriteOffCreatedBy", fields: [userId], references: [id], onDelete: Restrict)
+  userId    String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  items     StockWriteOffItem[]
+
+  @@index([storeId])
+}
+
+model StockWriteOffItem {
+  id         String        @id @default(cuid())
+  writeOff   StockWriteOff @relation(fields: [writeOffId], references: [id], onDelete: Cascade)
+  writeOffId String
+  product    Product       @relation(fields: [productId], references: [id])
+  productId  String
+  quantity   Int
+  costPrice  Decimal       @db.Decimal(12, 2)
+  serialUnit     SerialUnit?  @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  serialUnitId   String?      @unique
+  writeOffReason String?      @db.VarChar(1000)
+  updatedAt      DateTime     @updatedAt
+}
+
+enum DocumentStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+// ---- Custom Orders ----
+
+model CustomOrder {
+  id              String            @id @default(cuid())
+  number          String            @unique @db.VarChar(50)
+  store           Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId         String
+  seller          User              @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  sellerId        String
+  status          CustomOrderStatus @default(NEW)
+
+  clientName      String            @db.VarChar(100)
+  clientPhone     String            @db.VarChar(20)
+  clientEmail     String?           @db.VarChar(255)
+
+  totalAmount     Decimal           @db.Decimal(12, 2)
+  prepaidAmount   Decimal           @default(0) @db.Decimal(12, 2)
+  finalAmount     Decimal?          @db.Decimal(12, 2)
+  purchasePrice   Decimal?          @db.Decimal(12, 2)
+  deliveryCost    Decimal?          @db.Decimal(12, 2)
+
+  sale            Sale?             @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  saleId          String?           @unique
+
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierId      String?
+  supplierCity    String?           @db.VarChar(100)
+  estimatedDays   Int?
+  trackingInfo    String?           @db.VarChar(500)
+
+  comment         String?           @db.VarChar(1000)
+  // FIN-06: тип отмены — "HOLD" (удержать предоплату) | "REFUND" (вернуть клиенту).
+  // Nullable т.к. имеет смысл только при status=CANCELLED. Используется отчётами Phase 10.
+  cancellationType String?           @db.VarChar(50)
+  // FIN-06: текстовая причина отмены из CancelDialog.reason (audit trail).
+  cancelReason     String?           @db.VarChar(1000)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  completedAt     DateTime?
+
+  items           CustomOrderItem[]
+  payments        Payment[]
+  statusHistory   OrderStatusHistory[]
+  debt            SupplierDebt?
+
+  @@index([storeId, status])
+}
+
+enum CustomOrderStatus {
+  NEW
+  PREPAID
+  ORDERED
+  IN_TRANSIT
+  ARRIVED
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+}
+
+model CustomOrderItem {
+  id         String       @id @default(cuid())
+  order      CustomOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  product    Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId  String?
+  name       String       @db.VarChar(255)
+  quantity   Int
+  price      Decimal      @db.Decimal(12, 2)
+  costPrice  Decimal?     @db.Decimal(12, 2)
+  serialUnit    SerialUnit?  @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  serialUnitId  String?      @unique
+  requiresImei  Boolean      @default(false)
+  imei          String?      @db.VarChar(15)
+  updatedAt     DateTime     @updatedAt
+}
+
+model OrderStatusHistory {
+  id        String            @id @default(cuid())
+  order     CustomOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  status    CustomOrderStatus
+  comment   String?           @db.VarChar(1000)
+  changedBy User              @relation("StatusChangedBy", fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([orderId])
+}
+
+model SupplierDebt {
+  id         String      @id @default(cuid())
+  supplier   Supplier    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId String
+  order      CustomOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId    String      @unique
+  amount     Decimal     @db.Decimal(12, 2)
+  isPaid     Boolean     @default(false)
+  paidAt     DateTime?
+  comment    String?     @db.VarChar(1000)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  payments   SupplierPayment[]
+
+  @@index([supplierId])
+}
+
+model SupplierPayment {
+  id              String         @id @default(cuid())
+  debt            SupplierDebt   @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  debtId          String
+  amount          Decimal        @db.Decimal(12, 2)
+  comment         String?        @db.VarChar(1000)
+  cashOperation   CashOperation? @relation(fields: [cashOperationId], references: [id], onDelete: SetNull)
+  cashOperationId String?        @unique
+  user            User           @relation("SupplierPaymentUser", fields: [userId], references: [id], onDelete: Restrict)
+  userId          String
+  paidAt          DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([debtId])
+}
+
+// ---- Repairs ----
+
+enum RepairStatus {
+  RECEIVED
+  DIAGNOSING
+  WAITING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  READY_FOR_PICKUP
+  DELIVERED
+  CANCELLED
+}
+
+model Repair {
+  id              String       @id @default(cuid())
+  number          String       @unique @db.VarChar(50)
+  store           Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId         String
+  master          User?        @relation("RepairMaster", fields: [masterId], references: [id], onDelete: SetNull)
+  masterId        String?
+  createdBy       User         @relation("RepairCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById     String
+  status          RepairStatus @default(RECEIVED)
+
+  clientName      String       @db.VarChar(100)
+  clientPhone     String       @db.VarChar(20)
+
+  deviceType      String       @db.VarChar(100)
+  deviceBrand     String?      @db.VarChar(100)
+  deviceModel     String?      @db.VarChar(100)
+  deviceSerial    String?      @db.VarChar(100)
+  deviceCondition String       @db.VarChar(500)
+  devicePassword  String?      @db.VarChar(100)
+
+  defectDescription String     @db.VarChar(2000)
+  diagnosis         String?    @db.VarChar(2000)
+  workDone          String?    @db.VarChar(2000)
+
+  estimatedCost   Decimal?     @db.Decimal(12, 2)
+  agreedCost      Decimal?     @db.Decimal(12, 2)
+  finalCost       Decimal?     @db.Decimal(12, 2)
+
+  warrantyDays    Int          @default(30)
+  warrantyUntil   DateTime?
+
+  comment         String?      @db.VarChar(1000)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  completedAt     DateTime?
+
+  sale            Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  saleId          String?      @unique
+
+  payments        Payment[]
+  statusHistory   RepairStatusHistory[]
+  warrantyClaims  WarrantyClaim[]
+  parts           RepairPart[]
+  costHistory     RepairCostHistory[]
+  tradeIn     TradeIn?
+  deviceRecord    DeviceRecord?  @relation(fields: [deviceRecordId], references: [id], onDelete: SetNull)
+  deviceRecordId  String?
+  serialUnit      SerialUnit?    @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  serialUnitId    String?
+
+  @@index([storeId, status])
+}
+
+model RepairStatusHistory {
+  id        String       @id @default(cuid())
+  repair    Repair       @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId  String
+  status    RepairStatus
+  comment   String?      @db.VarChar(1000)
+  changedBy User         @relation("RepairStatusChangedBy", fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([repairId])
+}
+
+model RepairPart {
+  id          String   @id @default(cuid())
+  repair      Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId    String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId   String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId     String
+  quantity    Int
+  costPrice   Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([repairId])
+}
+
+model RepairCostHistory {
+  id        String   @id @default(cuid())
+  repair    Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId  String
+  field     String   @db.VarChar(50) // 'estimatedCost' | 'agreedCost' | 'finalCost'
+  oldValue  Decimal? @db.Decimal(12, 2)
+  newValue  Decimal? @db.Decimal(12, 2)
+  changedBy User     @relation("RepairCostChangedBy", fields: [userId], references: [id], onDelete: Restrict)
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([repairId])
+}
+
+model WarrantyClaim {
+  id             String               @id @default(cuid())
+  number         String               @unique @db.VarChar(50)
+  type           WarrantyClaimType
+  status         WarrantyClaimStatus   @default(RECEIVED)
+  serialUnit     SerialUnit?          @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  serialUnitId   String?
+  repair         Repair?              @relation(fields: [repairId], references: [id], onDelete: SetNull)
+  repairId       String?
+  deviceRecord   DeviceRecord?        @relation(fields: [deviceRecordId], references: [id], onDelete: SetNull)
+  deviceRecordId String?
+  store          Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId        String
+  customer       Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId     String?
+  description    String               @db.VarChar(2000)
+  resolution     String?              @db.VarChar(2000)
+  resolvedAt     DateTime?
+  createdBy      User                 @relation("WarrantyClaimCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById    String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([storeId, status])
+  @@index([type, status])
+}
+
+enum WarrantyClaimStatus {
+  RECEIVED
+  DIAGNOSING
+  SENT_TO_SUPPLIER
+  REPLACEMENT_PENDING
+  RESOLVED
+  REJECTED
+}
+
+// ---- Price Labels ----
+
+model PriceLabelTemplate {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  name        String   @db.VarChar(100)
+  width       Int
+  height      Int
+  layout      Json
+  isDefault   Boolean  @default(false)
+  createdById String
+  createdBy   User     @relation("PriceLabelCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---- Document Templates ----
+
+enum DocumentType {
+  SALE_RECEIPT
+  ORDER_FORM
+  RECEIVE_DOC
+  WRITE_OFF_DOC
+  REPAIR_RECEIPT
+  REPAIR_DELIVERY
+  TRADE_IN_CONTRACT
+  RETURN_ACT
+}
+
+model DocumentTemplate {
+  id          String       @id @default(cuid())
+  storeId     String
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  name        String       @db.VarChar(100)
+  type        DocumentType
+  layout      Json
+  isDefault   Boolean      @default(false)
+  createdById String
+  createdBy   User         @relation("DocumentTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ---- Motivation ----
+
+enum SchemeStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  ARCHIVED
+}
+
+enum PayrollStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+}
+
+model MotivationGroup {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(1000)
+  products    MotivationGroupProduct[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MotivationGroupProduct {
+  groupId   String
+  group     MotivationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  updatedAt DateTime        @updatedAt
+
+  @@id([groupId, productId])
+  @@unique([productId])
+}
+
+model MotivationScheme {
+  id             String       @id @default(cuid())
+  name           String   @db.VarChar(100)
+  description    String?  @db.VarChar(1000)
+  formula        Json
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  createdById    String
+  createdBy      User         @relation("SchemeCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedById   String?
+  approvedBy     User?        @relation("SchemeApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt     DateTime?
+  parentSchemeId String?
+  parentScheme   MotivationScheme?  @relation("SchemeVersions", fields: [parentSchemeId], references: [id], onDelete: SetNull)
+  childSchemes   MotivationScheme[] @relation("SchemeVersions")
+  status          SchemeStatus @default(ACTIVE)
+  rejectionReason String?  @db.VarChar(1000)
+  assignments     MotivationAssignment[]
+  payrolls       Payroll[]
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model MotivationAssignment {
+  id              String            @id @default(cuid())
+  schemeId        String
+  scheme          MotivationScheme  @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  storeId         String
+  store           Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime?
+  formulaSnapshot Json?             // Snapshot формулы на момент назначения
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([userId, storeId, startDate])
+  @@index([schemeId])
+}
+
+model Payroll {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  storeId       String
+  store         Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  schemeId      String
+  scheme        MotivationScheme  @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+  periodStart   DateTime
+  periodEnd     DateTime
+  shiftsCount   Int
+  dailyTotal    Decimal           @db.Decimal(12, 2)
+  commissions   Decimal           @db.Decimal(12, 2)
+  crossBonuses  Decimal           @db.Decimal(12, 2)
+  repairBonuses Decimal           @db.Decimal(12, 2)
+  returns       Decimal           @db.Decimal(12, 2)
+  totalAmount   Decimal           @db.Decimal(12, 2)
+  isAdvance     Boolean           @default(false)
+  status        PayrollStatus     @default(DRAFT)
+  breakdown     Json
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId, periodStart])
+  @@index([storeId])
+}
+
+// ---- Customers ----
+
+model Customer {
+  id              String    @id @default(cuid())
+  name            String    @db.VarChar(100)
+  phone           String    @db.VarChar(20)
+  passportSeries  String?   @db.VarChar(4)
+  passportNumber  String?   @db.VarChar(6)
+  passportIssuedBy String?  @db.VarChar(500)
+  passportIssuedAt DateTime?
+  comment         String?   @db.VarChar(1000)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tradeIns        TradeIn[]
+  warrantyClaims  WarrantyClaim[]
+  deviceRecords   DeviceRecord[]
+
+  @@index([phone])
+  @@index([deletedAt])
+}
+
+// ---- Trade-in ----
+
+enum TradeInType {
+  TRADE_IN
+  BUYBACK
+}
+
+enum TradeInStatus {
+  PENDING
+  IN_STOCK
+  IN_REPAIR
+  SOLD
+  WRITTEN_OFF
+}
+
+// ---- Shifts & Funds ----
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+  AUTO_CLOSED
+}
+
+enum CashOpType {
+  WITHDRAW
+  DEPOSIT
+}
+
+enum IdentifierType {
+  IMEI
+  SN
+  BOTH
+}
+
+enum SerialUnitStatus {
+  IN_STOCK
+  SOLD
+  IN_TRANSFER
+  RETURNED
+  WRITTEN_OFF
+  IN_REPAIR
+  MISSING
+}
+
+enum SerialUnitEvent {
+  RECEIVED
+  TRANSFERRED_OUT
+  TRANSFERRED_IN
+  SOLD
+  RETURNED
+  WRITTEN_OFF
+  REPAIR_IN
+  REPAIR_OUT
+  COST_ADJUSTED
+  IMEI_CORRECTED
+  MISSING
+  MISSING_RESOLVED
+}
+
+enum StockChangeReason {
+  SALE
+  RETURN
+  RECEIVE
+  TRANSFER_OUT
+  TRANSFER_IN
+  AUDIT_SURPLUS
+  AUDIT_SHORTAGE
+  WRITE_OFF
+  ORDER_COMPLETE
+}
+
+model StoreProductHistory {
+  id              String            @id @default(cuid())
+  storeProduct    StoreProduct      @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+  storeProductId  String
+  quantityBefore  Int
+  quantityAfter   Int
+  reason          StockChangeReason
+  user            User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId          String
+  createdAt       DateTime          @default(now())
+
+  @@index([storeProductId, createdAt])
+  @@index([userId])
+}
+
+enum RelatedDocType {
+  SALE
+  STOCK_RECEIVE
+  STOCK_TRANSFER
+  RETURN
+  WRITE_OFF
+  REPAIR
+  TRADE_IN
+  WARRANTY_CLAIM
+}
+
+enum WarrantyClaimType {
+  SALE_WARRANTY
+  REPAIR_WARRANTY
+}
+
+enum AuditSerialStatus {
+  FOUND
+  MISSING
+  SURPLUS
+}
+
+model TradeIn {
+  id              String        @id @default(cuid())
+  number          String        @unique @db.VarChar(50)
+  type            TradeInType
+  status          TradeInStatus @default(PENDING)
+
+  store           Store         @relation(fields: [storeId], references: [id])
+  storeId         String
+  acceptedBy      User          @relation("TradeInAcceptedBy", fields: [acceptedById], references: [id])
+  acceptedById    String
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerId      String
+
+  deviceType      String        @db.VarChar(100)
+  deviceBrand     String?       @db.VarChar(100)
+  deviceModel     String?       @db.VarChar(100)
+  deviceImei      String?       @db.VarChar(15)
+  deviceCondition String        @db.VarChar(500)
+
+  estimatedPrice  Decimal       @db.Decimal(12, 2)
+  agreedPrice     Decimal       @db.Decimal(12, 2)
+
+  sale            Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  saleId          String?
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId       String?       @unique
+  repair          Repair?       @relation(fields: [repairId], references: [id], onDelete: SetNull)
+  repairId        String?       @unique
+  payout          Payment?      @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  payoutId        String?       @unique
+
+  deviceRecord    DeviceRecord?  @relation(fields: [deviceRecordId], references: [id], onDelete: SetNull)
+  deviceRecordId  String?
+
+  comment         String?       @db.VarChar(1000)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([storeId, status])
+}
+
+model Shift {
+  id           String      @id @default(cuid())
+  number       String      @unique @db.VarChar(50)
+  store        Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId      String
+  openedBy     User        @relation("ShiftOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  openedById   String
+  closedBy     User?       @relation("ShiftClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  closedById   String?
+  status       ShiftStatus @default(OPEN)
+  openedAt     DateTime    @default(now())
+  closedAt     DateTime?
+  openingCash  Decimal     @db.Decimal(12, 2)
+  closingCash  Decimal?    @db.Decimal(12, 2)
+  expectedCash Decimal?    @db.Decimal(12, 2)
+  discrepancy  Decimal?    @db.Decimal(12, 2)
+  note         String?     @db.VarChar(1000)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sales          Sale[]
+  payments       Payment[]
+  returns        Return[]
+  cashOperations CashOperation[]
+
+  @@index([storeId, status])
+}
+
+model Fund {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(100)
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  storeId   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cashOperations CashOperation[]
+
+  @@unique([name, storeId])
+}
+
+model CashOperation {
+  id            String     @id @default(cuid())
+  shift         Shift?     @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId       String?
+  type          CashOpType
+  amount        Decimal    @db.Decimal(12, 2)
+  fund          Fund?      @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  fundId        String?
+  supplier      Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierId    String?
+  reason        String     @db.VarChar(1000)
+  performedBy   User       @relation("CashOpPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  performedById String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  supplierPayment SupplierPayment?
+
+  @@index([shiftId])
+}
+
+// ---- Serial / IMEI Tracking ----
+
+model SerialUnit {
+  id             String           @id @default(cuid())
+  product        Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId      String
+  store          Store            @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId        String
+  imei           String?          @unique @db.VarChar(15)
+  imei2          String?          @unique @db.VarChar(15)
+  serialNumber   String?          @db.VarChar(100)
+  status         SerialUnitStatus @default(IN_STOCK)
+  costPrice      Decimal          @db.Decimal(12, 2)
+  warrantyDays   Int              @default(365)
+  receiveItem    StockReceiveItem? @relation(fields: [receiveItemId], references: [id], onDelete: SetNull)
+  receiveItemId  String?
+  deviceRecord   DeviceRecord?    @relation(fields: [deviceRecordId], references: [id], onDelete: SetNull)
+  deviceRecordId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  history        SerialUnitHistory[]
+  saleItem       SaleItem?
+  writeOffItem   StockWriteOffItem?
+  customOrderItem CustomOrderItem?
+  repairs        Repair[]
+  warrantyClaims WarrantyClaim[]
+  transferItems  StockTransferItemSerial[]
+  auditSerials   InventoryAuditSerial[]
+
+  @@unique([productId, serialNumber])
+  @@index([productId, storeId, status])
+  @@index([storeId, status])
+}
+
+model SerialUnitHistory {
+  id             String          @id @default(cuid())
+  serialUnit     SerialUnit      @relation(fields: [serialUnitId], references: [id], onDelete: Cascade)
+  serialUnitId   String
+  event          SerialUnitEvent
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  storeId        String
+  performedBy    User            @relation("SerialUnitHistoryPerformer", fields: [performedById], references: [id], onDelete: Restrict)
+  performedById  String
+  relatedDocument String?        @db.VarChar(255)
+  relatedDocType  RelatedDocType?
+  comment        String?        @db.VarChar(1000)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([serialUnitId, createdAt])
+  @@index([storeId, createdAt])
+}
+
+model DeviceRecord {
+  id            String      @id @default(cuid())
+  imei          String?     @unique @db.VarChar(15)
+  imei2         String?     @unique @db.VarChar(15)
+  serialNumber  String?     @unique @db.VarChar(100)
+  deviceType    String      @db.VarChar(100)
+  brand         String?     @db.VarChar(100)
+  model         String?     @db.VarChar(100)
+  customer      Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId    String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  repairs        Repair[]
+  serialUnits    SerialUnit[]
+  warrantyClaims WarrantyClaim[]
+  tradeIns       TradeIn[]
+}
+
+model StockTransferItemSerial {
+  id              String            @id @default(cuid())
+  transferItem    StockTransferItem @relation(fields: [transferItemId], references: [id], onDelete: Cascade)
+  transferItemId  String
+  serialUnit      SerialUnit        @relation(fields: [serialUnitId], references: [id], onDelete: Restrict)
+  serialUnitId    String
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([transferItemId, serialUnitId])
+}
+
+model InventoryAuditSerial {
+  id            String              @id @default(cuid())
+  audit         InventoryAudit      @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId       String
+  auditItem     InventoryAuditItem  @relation(fields: [auditItemId], references: [id], onDelete: Cascade)
+  auditItemId   String
+  serialUnit    SerialUnit?         @relation(fields: [serialUnitId], references: [id])
+  serialUnitId  String?
+  scannedImei   String        @db.VarChar(15)
+  status        AuditSerialStatus
+  updatedAt     DateTime            @updatedAt
+
+  @@index([auditId, status])
+  @@index([auditItemId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   @db.VarChar(50) // CREATE, UPDATE, DELETE, ROLE_CHANGE, PERMISSION_CHANGE
+  entity    String   @db.VarChar(100) // Sale, User, Role, Customer, Store, etc.
+  entityId  String   @db.VarChar(255)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  storeId   String?
+  store     Store?   @relation(fields: [storeId], references: [id])
+  changes   Json?    // { field: { old: value, new: value } }
+  metadata  Json?    // additional context (IP, user agent, etc.)
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([storeId])
+  @@index([createdAt])
+  @@index([action])
+}
